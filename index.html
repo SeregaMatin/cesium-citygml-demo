@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.62/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.62/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style type="text/css">    
+    html, .application, .map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    
+    .tooltip {
+      display: none;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      min-width: 20px;
+      min-height: 20px;
+      pointer-events: none;
+      padding: 8px;
+      border: 2px solid rgba(0,0,0, 0.8);
+      border-radius: 4px;
+      background-color: #fff;
+      color: #000;
+      opacity: 0.8;
+    }
+    
+    .tooltip.active {
+      display: block;
+    }
+  </style>
+</head>
+<body class="application">
+  <div class="map"></div>
+  <script>
+    // Cesium ion is a platform for tiling and hosting 3D geospatial data which you can then add to your CesiumJS applications.
+    // To start using it first you need to create an account at https://cesium.com/.
+    // After that you'll be able to use Cesium Ion with your personal token like following.
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4YjY2NzUzZC01NTE0LTQ3YzAtYTIzNS1kNzNkODgzYjA5M2IiLCJpZCI6MTc0NDgsInNjb3BlcyI6WyJhc3IiLCJnYyJdLCJpYXQiOjE1NzIyNjUzMTR9.Crxj2nEFjaCS9qDD8GGPSCnYhzcnjdeLSEek6wzMFNA';
+    var mapContainer = document.getElementsByClassName('map')[0];
+    var viewer = new Cesium.Viewer(mapContainer, {
+      terrainProvider: Cesium.createWorldTerrain()
+    });
+    
+    // Asset with ID 51616 is a Reichstag model in City GML format (see https://github.com/SeregaMatin/cesium-citygml-demo/blob/master/CityGML/Reichstag.zip).
+    // But this City GMl asset was uploaded into Cesium Ion (https://cesium.com/ion/assets) and was also converted into 3d Tiles while uploading,
+    // the ID was assigned automatically.
+    // This is the only way how Cesium supports City GML (see paper about City GML in Cesium blog https://cesium.com/blog/2018/02/06/citygml-testbed-13/).
+    var reichstagTileset = new Cesium.Cesium3DTileset({
+      url: Cesium.IonResource.fromAssetId(51616)
+    });
+    
+    viewer.scene.primitives.add(reichstagTileset);
+    viewer.zoomTo(reichstagTileset, new Cesium.HeadingPitchRange(0.5, -0.5, 0));
+    
+    // Add overlay for showing feature name on mouseover.
+    var tooltipOverlay = document.createElement('div');
+    tooltipOverlay.className = 'tooltip';
+    viewer.container.appendChild(tooltipOverlay);
+    
+    var showTooltip = function(movement, feature) {
+      tooltipOverlay.style.bottom = viewer.canvas.clientHeight - movement.endPosition.y + 'px';
+      tooltipOverlay.style.left = movement.endPosition.x + 'px';
+      tooltipOverlay.innerHTML = feature.getProperty('gml:name');
+      tooltipOverlay.classList.add('active');
+    };
+    
+    var hideTooltip = function() {
+      tooltipOverlay.classList.remove('active');
+    };
+    
+    // Information about the currently selected feature
+    var selected = {
+      feature: undefined,
+      originalColor: new Cesium.Color()
+    };
+
+    // An entity object which will hold info about the currently selected feature for infobox display.
+    var selectedEntity = new Cesium.Entity();
+
+    // Get default left click handler for when a feature is not picked on left click
+    var clickHandler = viewer.screenSpaceEventHandler.getInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    
+    var silhouetteBlue = Cesium.PostProcessStageLibrary.createEdgeDetectionStage();
+    silhouetteBlue.uniforms.color = Cesium.Color.BLUE;
+    silhouetteBlue.uniforms.length = 0.02;
+    silhouetteBlue.selected = [];
+
+    var silhouetteGreen = Cesium.PostProcessStageLibrary.createEdgeDetectionStage();
+    silhouetteGreen.uniforms.color = Cesium.Color.LIME;
+    silhouetteGreen.uniforms.length = 0.02;
+    silhouetteGreen.selected = [];
+
+    viewer.scene.postProcessStages.add(Cesium.PostProcessStageLibrary.createSilhouetteStage([silhouetteBlue, silhouetteGreen]));
+
+    // Silhouette a feature blue on hover.
+    viewer.screenSpaceEventHandler.setInputAction(function onMouseMove(movement) {
+        // If a feature was previously highlighted, undo the highlight.
+        silhouetteBlue.selected = [];
+
+        // Pick a new feature.
+        var pickedFeature = viewer.scene.pick(movement.endPosition);
+        if (!Cesium.defined(pickedFeature)) {
+            hideTooltip();
+            return;
+        }
+
+        showTooltip(movement, pickedFeature);
+
+        // Highlight the feature if it's not already selected.
+        if (pickedFeature !== selected.feature) {
+          silhouetteBlue.selected = [pickedFeature];
+        }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+    
+    // Silhouette a feature on selection and show metadata in the InfoBox.
+    viewer.screenSpaceEventHandler.setInputAction(function onLeftClick(movement) {
+        // If a feature was previously selected, undo the highlight.
+        silhouetteGreen.selected = [];
+
+        // Pick a new feature.
+        var pickedFeature = viewer.scene.pick(movement.position);
+        if (!Cesium.defined(pickedFeature)) {
+            clickHandler(movement);
+            return;
+        }
+
+        // Select the feature if it's not already selected.
+        if (silhouetteGreen.selected[0] === pickedFeature) {
+            return;
+        }
+
+        // Save the selected feature's original color
+        var highlightedFeature = silhouetteBlue.selected[0];
+        if (pickedFeature === highlightedFeature) {
+            silhouetteBlue.selected = [];
+        }
+
+        // Highlight newly selected feature.
+        silhouetteGreen.selected = [pickedFeature];
+
+        // Set feature infobox description.
+        var featureName = pickedFeature.getProperty('gml:name');
+        selectedEntity.name = featureName;
+        selectedEntity.description = 'Loading <div class="cesium-infoBox-loading"></div>';
+        viewer.selectedEntity = selectedEntity;
+        selectedEntity.description = '<table class="cesium-infoBox-defaultTable">' +
+          '<tbody>' +
+          '<tr><th>Height</th><td>' + pickedFeature.getProperty('Height') + '</td></tr>' +
+          '<tr><th>Latitude</th><td>' + pickedFeature.getProperty('Latitude') + '</td></tr>' +
+          '<tr><th>Longitude</th><td>' + pickedFeature.getProperty('Longitude') + '</td></tr>' +
+          '</tbody>' +
+          '</table>';
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  </script>
+</body>
+</html>
