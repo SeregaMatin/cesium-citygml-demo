@@ -46,12 +46,12 @@
       terrainProvider: Cesium.createWorldTerrain()
     });
     
-    // Asset with ID 51616 is a Reichstag model in City GML format (see https://github.com/SeregaMatin/cesium-citygml-demo/blob/master/CityGML/Reichstag.zip).
+    // Asset with ID 55205 is a model with some Berlin buildings in City GML format (see https://github.com/SeregaMatin/cesium-citygml-demo/blob/master/CityGML/Reichstag.zip).
     // But this City GMl asset was uploaded into Cesium Ion (https://cesium.com/ion/assets) and was also converted into 3d Tiles while uploading,
     // the ID was assigned automatically.
     // This is the only way how Cesium supports City GML (see paper about City GML in Cesium blog https://cesium.com/blog/2018/02/06/citygml-testbed-13/).
     var reichstagTileset = new Cesium.Cesium3DTileset({
-      url: Cesium.IonResource.fromAssetId(51616)
+      url: Cesium.IonResource.fromAssetId(55205)
     });
     
     viewer.scene.primitives.add(reichstagTileset);
@@ -65,7 +65,7 @@
     var showTooltip = function(movement, feature) {
       tooltipOverlay.style.bottom = viewer.canvas.clientHeight - movement.endPosition.y + 'px';
       tooltipOverlay.style.left = movement.endPosition.x + 'px';
-      tooltipOverlay.innerHTML = feature.getProperty('gml:name');
+      tooltipOverlay.innerHTML = feature.getProperty('Name');
       tooltipOverlay.classList.add('active');
     };
     
@@ -144,15 +144,18 @@
         silhouetteGreen.selected = [pickedFeature];
 
         // Set feature infobox description.
-        var featureName = pickedFeature.getProperty('gml:name');
+        var featureName = pickedFeature.getProperty('Name');
         selectedEntity.name = featureName;
         selectedEntity.description = 'Loading <div class="cesium-infoBox-loading"></div>';
         viewer.selectedEntity = selectedEntity;
         selectedEntity.description = '<table class="cesium-infoBox-defaultTable">' +
           '<tbody>' +
-          '<tr><th>Height</th><td>' + pickedFeature.getProperty('Height') + '</td></tr>' +
-          '<tr><th>Latitude</th><td>' + pickedFeature.getProperty('Latitude') + '</td></tr>' +
-          '<tr><th>Longitude</th><td>' + pickedFeature.getProperty('Longitude') + '</td></tr>' +
+          '<tr><th>Широта</th><td>' + pickedFeature.getProperty('Latitude') + '</td></tr>' +
+          '<tr><th>Долгота</th><td>' + pickedFeature.getProperty('Longitude') + '</td></tr>' +
+          '<tr><th>Архитектор</th><td>' + pickedFeature.getProperty('Architect') + '</td></tr>' +
+          '<tr><th>Годы постройки</th><td>' + pickedFeature.getProperty('YearOfConstruction') + '</td></tr>' +
+          '<tr><th>Текущее состояние</th><td>' + pickedFeature.getProperty('State') + '</td></tr>' +
+          '<tr><th>Описание</th><td>' + pickedFeature.getProperty('Description') + '</td></tr>' +
           '</tbody>' +
           '</table>';
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
